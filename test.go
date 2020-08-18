@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"log"
 	"net/http"
 
 	"docker.io/go-docker"
@@ -21,9 +23,36 @@ type Container struct {
 	Status  string
 }
 
-func showContainers(w http.ResponseWriter, r *http.Request) {
-	cli, err := docker.NewEnvClient()
+func checkAPIKey(next http.HandlerFunc) http.HandlerFunc {
+	return func(res http.ResponseWriter, req *http.Request) {
+		apiKey := req.Header.Get("X-Api-Key")
 
+		if apiKey == "" {
+			return
+		}
+		next(res, req)
+	}
+}
+
+func loggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
+
+		log.Println("Method:", req.Method)
+		log.Println("Route:", req.RequestURI)
+		log.Println("Body:", req.Body)
+		log.Println("Host:", req.Host)
+		log.Println("Remote Address:", req.RemoteAddr)
+
+		next.ServeHTTP(res, req)
+	})
+}
+
+func test(res http.ResponseWriter, req *http.Request) {
+	fmt.Println("You hit test")
+}
+
+func showContainers(res http.ResponseWriter, req *http.Request) {
+	cli, err := docker.NewEnvClient()
 	dockerJSON := []Container{}
 
 	if err != nil {
@@ -44,13 +73,17 @@ func showContainers(w http.ResponseWriter, r *http.Request) {
 		"data": dockerJSON,
 	}
 
-	json.NewEncoder(w).Encode(response)
+	json.NewEncoder(res).Encode(response)
 }
 
 func main() {
 	router := mux.NewRouter()
 
-	router.HandleFunc("/containers", showContainers).Methods("GET")
+	router.Use(loggingMiddleware)
+
+	router.HandleFunc("/containers", checkAPIKey(showContainers)).Methods("GET")
+	//testing to see if loggingMiddleware working for all routes
+	router.HandleFunc("/test", test).Methods("GET")
 
 	http.ListenAndServe(":3000", router)
 }
