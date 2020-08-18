@@ -23,7 +23,8 @@ type Container struct {
 
 func showContainers(w http.ResponseWriter, r *http.Request) {
 	cli, err := docker.NewEnvClient()
-	var dockerJSON []Container
+
+	dockerJSON := []Container{}
 
 	if err != nil {
 		panic(err)
@@ -38,9 +39,11 @@ func showContainers(w http.ResponseWriter, r *http.Request) {
 	for _, c := range containers {
 		dockerJSON = append(dockerJSON, Container{c.ID[:10], c.Image, c.ImageID, c.Command, c.Created, c.State, c.Status})
 	}
+
 	response := map[string][]Container{
 		"data": dockerJSON,
 	}
+
 	json.NewEncoder(w).Encode(response)
 }
 
